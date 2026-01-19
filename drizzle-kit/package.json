@@ -1,6 +1,6 @@
 {
 	"name": "drizzle-kit",
-	"version": "0.31.8",
+	"version": "0.31.8-custom.1",
 	"homepage": "https://orm.drizzle.team",
 	"keywords": [
 		"drizzle",
@@ -36,10 +36,10 @@
 		"migrate:old": "drizzle-kit generate:mysql",
 		"cli": "tsx ./src/cli/index.ts",
 		"test": "pnpm tsc && TEST_CONFIG_PATH_PREFIX=./tests/cli/ vitest",
-		"build": "rm -rf ./dist && tsx build.ts && cp package.json dist/ && attw --pack dist",
-		"build:dev": "rm -rf ./dist && tsx build.dev.ts && tsc -p tsconfig.cli-types.json && chmod +x ./dist/index.cjs",
-		"pack": "cp package.json README.md dist/ && (cd dist && npm pack --pack-destination ..) && rm -f package.tgz && mv *.tgz package.tgz",
-		"release:prepare": "pnpm build && pnpm pack",
+		"build": "node scripts/clean-dist.js && tsx build.ts && node scripts/copy-files.js && attw --pack dist",
+		"build:dev": "node scripts/clean-dist.js && tsx build.dev.ts && tsc -p tsconfig.cli-types.json && chmod +x ./dist/index.cjs",
+		"pack": "node scripts/copy-files.js && node scripts/remove-prepare.js && (cd dist && npm pack --pack-destination ..) && node scripts/cleanup-tgz.js",
+		"release:prepare": "node scripts/build-orm.js && pnpm build && pnpm pack",
 		"tsc": "tsc -p tsconfig.build.json --noEmit",
 		"publish": "npm publish package.tgz",
 		"prepare": "npm run build"

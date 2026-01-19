@@ -485,6 +485,7 @@ export const preparePullConfig = async (
 		schemasFilter: string[];
 		prefix: Prefix;
 		entities: Entities;
+		quiet: boolean;
 	}
 > => {
 	const raw = flattenPull(
@@ -493,6 +494,9 @@ export const preparePullConfig = async (
 			: options,
 	);
 	const parsed = pullParams.safeParse(raw);
+
+	// Extract quiet option (default: true, disabled with --progress flag)
+	const quiet = !(options['progress'] === true || raw['progress'] === true);
 
 	if (parsed.error) {
 		console.log(error('Please provide required params:'));
@@ -545,6 +549,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 
@@ -564,6 +569,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 
@@ -584,6 +590,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 
@@ -603,6 +610,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 
@@ -622,6 +630,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 
@@ -641,6 +650,7 @@ export const preparePullConfig = async (
 			schemasFilter,
 			prefix: config.migrations?.prefix || 'index',
 			entities: config.entities,
+			quiet,
 		};
 	}
 

@@ -423,6 +423,7 @@ type IntrospectState = {
 export class IntrospectProgress extends TaskView {
 	private readonly spinner: Spinner = new Spinner('⣷⣯⣟⡿⢿⣻⣽⣾'.split(''));
 	private timeout: NodeJS.Timeout | undefined;
+	private readonly quiet: boolean;
 
 	private state: IntrospectState = {
 		tables: {
@@ -467,14 +468,19 @@ export class IntrospectProgress extends TaskView {
 		},
 	};
 
-	constructor(private readonly hasEnums: boolean = false) {
+	constructor(private readonly hasEnums: boolean = false, quiet: boolean = false) {
 		super();
-		this.timeout = setInterval(() => {
-			this.spinner.tick();
-			this.requestLayout();
-		}, 128);
+		this.quiet = quiet;
 
-		this.on('detach', () => clearInterval(this.timeout));
+		// Only start animation if not in quiet mode
+		if (!this.quiet) {
+			this.timeout = setInterval(() => {
+				this.spinner.tick();
+				this.requestLayout();
+			}, 128);
+
+			this.on('detach', () => clearInterval(this.timeout));
+		}
 	}
 
 	public update(
@@ -510,7 +516,32 @@ export class IntrospectProgress extends TaskView {
 		return `${prefix} ${suffix}\n`;
 	};
 
+	private isAllDone(): boolean {
+		const stages: IntrospectStage[] = ['tables', 'columns', 'indexes', 'fks', 'policies', 'checks', 'views'];
+		if (this.hasEnums) stages.push('enums');
+		return stages.every((stage) => this.state[stage].status === 'done');
+	}
+
+	public getFinalSummary(): string {
+		let info = '';
+		const checkmark = chalk.green('✓');
+		info += this.statusText(checkmark, this.state.tables);
+		info += this.statusText(checkmark, this.state.columns);
+		info += this.hasEnums ? this.statusText(checkmark, this.state.enums) : '';
+		info += this.statusText(checkmark, this.state.indexes);
+		info += this.statusText(checkmark, this.state.fks);
+		info += this.statusText(checkmark, this.state.policies);
+		info += this.statusText(checkmark, this.state.checks);
+		info += this.statusText(checkmark, this.state.views);
+		return info;
+	}
+
 	render(): string {
+		// In quiet mode, don't render anything during the process
+		if (this.quiet) {
+			return '';
+		}
+
 		let info = '';
 		const spin = this.spinner.value();
 		info += this.statusText(spin, this.state.tables);
@@ -523,6 +554,10 @@ export class IntrospectProgress extends TaskView {
 		info += this.statusText(spin, this.state.views);
 
 		return info;
+	}
+
+	public isQuiet(): boolean {
+		return this.quiet;
 	}
 }
 

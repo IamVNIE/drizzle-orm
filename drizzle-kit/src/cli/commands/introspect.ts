@@ -61,6 +61,7 @@ export const introspectPostgres = async (
 	schemasFilter: string[],
 	prefix: Prefix,
 	entities: Entities,
+	quiet: boolean = false,
 ) => {
 	const { preparePostgresDB } = await import('../connections');
 	const db = await preparePostgresDB(credentials);
@@ -92,7 +93,7 @@ export const introspectPostgres = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress(true);
+	const progress = new IntrospectProgress(true, quiet);
 
 	const res = await renderWithTask(
 		progress,
@@ -106,6 +107,11 @@ export const introspectPostgres = async (
 			},
 		),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as PgSchema;
 	const ts = postgresSchemaToTypeScript(schema, casing);
@@ -187,6 +193,7 @@ export const introspectGel = async (
 	schemasFilter: string[],
 	prefix: Prefix,
 	entities: Entities,
+	quiet: boolean = false,
 ) => {
 	const { prepareGelDB } = await import('../connections');
 	const db = await prepareGelDB(credentials);
@@ -218,7 +225,7 @@ export const introspectGel = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress(true);
+	const progress = new IntrospectProgress(true, quiet);
 
 	const res = await renderWithTask(
 		progress,
@@ -232,6 +239,11 @@ export const introspectGel = async (
 			},
 		),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as GelSchema;
 	const ts = gelSchemaToTypeScript(schema, casing);
@@ -311,6 +323,7 @@ export const introspectMysql = async (
 	credentials: MysqlCredentials,
 	tablesFilter: string[],
 	prefix: Prefix,
+	quiet: boolean = false,
 ) => {
 	const { connectToMySQL } = await import('../connections');
 	const { db, database } = await connectToMySQL(credentials);
@@ -342,13 +355,18 @@ export const introspectMysql = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress();
+	const progress = new IntrospectProgress(false, quiet);
 	const res = await renderWithTask(
 		progress,
 		fromMysqlDatabase(db, database, filter, (stage, count, status) => {
 			progress.update(stage, count, status);
 		}),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as MySqlSchema;
 	const ts = mysqlSchemaToTypeScript(schema, casing);
@@ -422,6 +440,7 @@ export const introspectSingleStore = async (
 	credentials: SingleStoreCredentials,
 	tablesFilter: string[],
 	prefix: Prefix,
+	quiet: boolean = false,
 ) => {
 	const { connectToSingleStore } = await import('../connections');
 	const { db, database } = await connectToSingleStore(credentials);
@@ -453,13 +472,18 @@ export const introspectSingleStore = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress();
+	const progress = new IntrospectProgress(false, quiet);
 	const res = await renderWithTask(
 		progress,
 		fromSingleStoreDatabase(db, database, filter, (stage, count, status) => {
 			progress.update(stage, count, status);
 		}),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as SingleStoreSchema;
 	const ts = singlestoreSchemaToTypeScript(schema, casing);
@@ -519,6 +543,7 @@ export const introspectSqlite = async (
 	credentials: SqliteCredentials,
 	tablesFilter: string[],
 	prefix: Prefix,
+	quiet: boolean = false,
 ) => {
 	const { connectToSQLite } = await import('../connections');
 	const db = await connectToSQLite(credentials);
@@ -550,13 +575,18 @@ export const introspectSqlite = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress();
+	const progress = new IntrospectProgress(false, quiet);
 	const res = await renderWithTask(
 		progress,
 		fromSqliteDatabase(db, filter, (stage, count, status) => {
 			progress.update(stage, count, status);
 		}),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as SQLiteSchema;
 	const ts = sqliteSchemaToTypeScript(schema, casing);
@@ -631,6 +661,7 @@ export const introspectLibSQL = async (
 	credentials: LibSQLCredentials,
 	tablesFilter: string[],
 	prefix: Prefix,
+	quiet: boolean = false,
 ) => {
 	const { connectToLibSQL } = await import('../connections');
 	const db = await connectToLibSQL(credentials);
@@ -662,13 +693,18 @@ export const introspectLibSQL = async (
 		return false;
 	};
 
-	const progress = new IntrospectProgress();
+	const progress = new IntrospectProgress(false, quiet);
 	const res = await renderWithTask(
 		progress,
 		fromSqliteDatabase(db, filter, (stage, count, status) => {
 			progress.update(stage, count, status);
 		}),
 	);
+
+	// Print final summary in quiet mode
+	if (progress.isQuiet()) {
+		console.log(progress.getFinalSummary());
+	}
 
 	const schema = { id: originUUID, prevId: '', ...res } as SQLiteSchema;
 	const ts = sqliteSchemaToTypeScript(schema, casing);

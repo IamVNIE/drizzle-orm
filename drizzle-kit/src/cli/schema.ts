@@ -476,6 +476,7 @@ export const pull = command({
 		out: optionOut,
 		breakpoints: optionBreakpoints,
 		casing: string('introspect-casing').enum('camel', 'preserve'),
+		progress: boolean('progress').desc('Show animated progress spinner during introspection'),
 		...optionsFilters,
 		...optionsDatabaseCredentials,
 	},
@@ -502,6 +503,7 @@ export const pull = command({
 				'schemaFilters',
 				'extensionsFilters',
 				'tlsSecurity',
+				'progress',
 			],
 		);
 		return preparePullConfig(opts, from);
@@ -520,6 +522,7 @@ export const pull = command({
 			schemasFilter,
 			prefix,
 			entities,
+			quiet,
 		} = config;
 		mkdirSync(out, { recursive: true });
 
@@ -567,6 +570,7 @@ export const pull = command({
 					schemasFilter,
 					prefix,
 					entities,
+					quiet,
 				);
 			} else if (dialect === 'mysql') {
 				const { introspectMysql } = await import('./commands/introspect');
@@ -577,6 +581,7 @@ export const pull = command({
 					credentials,
 					tablesFilter,
 					prefix,
+					quiet,
 				);
 			} else if (dialect === 'sqlite') {
 				const { introspectSqlite } = await import('./commands/introspect');
@@ -587,6 +592,7 @@ export const pull = command({
 					credentials,
 					tablesFilter,
 					prefix,
+					quiet,
 				);
 			} else if (dialect === 'turso') {
 				const { introspectLibSQL } = await import('./commands/introspect');
@@ -597,6 +603,7 @@ export const pull = command({
 					credentials,
 					tablesFilter,
 					prefix,
+					quiet,
 				);
 			} else if (dialect === 'singlestore') {
 				const { introspectSingleStore } = await import('./commands/introspect');
@@ -607,6 +614,7 @@ export const pull = command({
 					credentials,
 					tablesFilter,
 					prefix,
+					quiet,
 				);
 			} else if (dialect === 'gel') {
 				const { introspectGel } = await import('./commands/introspect');
@@ -619,6 +627,7 @@ export const pull = command({
 					schemasFilter,
 					prefix,
 					entities,
+					quiet,
 				);
 			} else {
 				assertUnreachable(dialect);

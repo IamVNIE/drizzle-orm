@@ -39,8 +39,10 @@
 		"build": "rm -rf ./dist && tsx build.ts && cp package.json dist/ && attw --pack dist",
 		"build:dev": "rm -rf ./dist && tsx build.dev.ts && tsc -p tsconfig.cli-types.json && chmod +x ./dist/index.cjs",
 		"pack": "cp package.json README.md dist/ && (cd dist && npm pack --pack-destination ..) && rm -f package.tgz && mv *.tgz package.tgz",
+		"release:prepare": "pnpm build && pnpm pack",
 		"tsc": "tsc -p tsconfig.build.json --noEmit",
-		"publish": "npm publish package.tgz"
+		"publish": "npm publish package.tgz",
+		"prepare": "npm run build"
 	},
 	"dependencies": {
 		"@drizzle-team/brocli": "^0.10.2",

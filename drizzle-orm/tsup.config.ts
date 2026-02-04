@@ -1,7 +1,7 @@
 import { globSync } from 'glob';
 import { defineConfig } from 'tsup';
 
-const entries = globSync('src/**/*.ts');
+const entries = globSync('src/**/*.ts').map(p => p.replace(/\\/g, '/'));
 
 export default defineConfig({
 	entry: entries,

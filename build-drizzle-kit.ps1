@@ -1,6 +1,32 @@
 # Build Custom Drizzle Kit
 # This script automates the build process for the custom drizzle-kit package
 
+<#
+  ---------------------------------------------------------
+  .\build-drizzle-kit.ps1 Usage
+
+  # Skip drizzle-orm build (if already built)
+  .\build-drizzle-kit.ps1 -SkipOrmBuild
+
+  # Clean build (removes all previous build artifacts first)
+  .\build-drizzle-kit.ps1 -Clean
+
+  # Clean build, skip ORM
+  .\build-drizzle-kit.ps1 -Clean -SkipOrmBuild
+
+  What the script does:
+  1. Optionally cleans previous build artifacts
+  2. Builds drizzle-orm (generates types and bundles)
+  3. Builds drizzle-kit (tsup bundles + type declarations)
+  4. Prepares package.json for distribution (removes dev dependencies)
+  5. Creates npm tarball (.tgz file)
+  6. Verifies the build by checking version output
+
+  Output:
+  - drizzle-kit/dist/ - Built distribution files
+  - drizzle-kit/drizzle-kit-0.31.8-custom.2.tgz - Installable npm package
+#>
+
 param(
     [switch]$SkipOrmBuild,
     [switch]$Clean

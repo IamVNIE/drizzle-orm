@@ -24,6 +24,14 @@ import type { PostgresCredentials } from './validations/postgres';
 import { SingleStoreCredentials } from './validations/singlestore';
 import type { SqliteCredentials } from './validations/sqlite';
 
+// Introspection (pull) runs its per-table queries concurrently. A pool of one
+// connection runs them one after another, which is very slow when the database
+// is far away (about 7 round trips per table). DRIZZLE_KIT_POOL_MAX overrides it.
+const pgPoolMax = (): number => {
+	const n = Number.parseInt(process.env['DRIZZLE_KIT_POOL_MAX'] ?? '', 10);
+	return Number.isFinite(n) && n > 0 ? n : 8;
+};
+
 export const preparePostgresDB = async (
 	credentials: PostgresCredentials | {
 		driver: 'pglite';
@@ -218,8 +226,8 @@ export const preparePostgresDB = async (
 		};
 
 		const client = 'url' in credentials
-			? new pg.Pool({ connectionString: credentials.url, max: 1 })
-			: new pg.Pool({ ...credentials, ssl, max: 1 });
+			? new pg.Pool({ connectionString: credentials.url, max: pgPoolMax() })
+			: new pg.Pool({ ...credentials, ssl, max: pgPoolMax() });
 
 		const db = drizzle(client);
 		const migrateFn = async (config: MigrationConfig) => {
@@ -280,8 +288,8 @@ export const preparePostgresDB = async (
 		const { migrate } = await import('drizzle-orm/postgres-js/migrator');
 
 		const client = 'url' in credentials
-			? postgres.default(credentials.url, { max: 1 })
-			: postgres.default({ ...credentials, max: 1 });
+			? postgres.default(credentials.url, { max: pgPoolMax() })
+			: postgres.default({ ...credentials, max: pgPoolMax() });
 
 		const transparentParser = (val: any) => val;
 
@@ -473,8 +481,8 @@ export const preparePostgresDB = async (
 		};
 
 		const client = 'url' in credentials
-			? new Pool({ connectionString: credentials.url, max: 1 })
-			: new Pool({ ...credentials, max: 1, ssl });
+			? new Pool({ connectionString: credentials.url, max: pgPoolMax() })
+			: new Pool({ ...credentials, max: pgPoolMax(), ssl });
 		neonConfig.webSocketConstructor = ws;
 
 		const db = drizzle(client);

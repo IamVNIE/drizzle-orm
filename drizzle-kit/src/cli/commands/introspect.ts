@@ -874,7 +874,7 @@ export const relationsToTypeScript = (
 		uniqueImports.join(
 			', ',
 		)
-	} } from "./schema";\n\n`;
+	} } from "./schema.ts";\n\n`;
 
 	const relationStatements = Object.entries(tableRelations).map(
 		([table, relations]) => {

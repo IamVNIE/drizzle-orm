@@ -1006,7 +1006,12 @@ JOIN
     pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 WHERE 
 	c.relkind IN ('r', 'v', 'm') 
-    ${where === '' ? '' : ` AND ${where}`};`,
+    ${where === '' ? '' : ` AND ${where}`}
+    AND NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_depend d
+        WHERE d.classid = 'pg_catalog.pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e'
+    )
+ORDER BY n.nspname, c.relname;`,
 	);
 
 	const schemas = new Set(allTables.map((it) => it.table_schema));
@@ -1228,12 +1233,19 @@ WHERE
 					const tableResponse = await getColumnsInfoQuery({ schema: tableSchema, table: tableName, db });
 
 					const tableConstraints = await db.query(
-						`SELECT c.column_name, c.data_type, constraint_type, constraint_name, constraint_schema
-      FROM information_schema.table_constraints tc
-      JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-      JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
-        AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
-      WHERE tc.table_name = '${tableName}' and constraint_schema = '${tableSchema}';`,
+						`SELECT a.attname AS column_name,
+        format_type(a.atttypid, a.atttypmod) AS data_type,
+        CASE con.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'UNIQUE' END AS constraint_type,
+        con.conname AS constraint_name,
+        nsp.nspname AS constraint_schema
+      FROM pg_catalog.pg_constraint con
+      JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+      JOIN pg_catalog.pg_namespace nsp ON nsp.oid = rel.relnamespace
+      CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+      WHERE con.contype IN ('p', 'u')
+        AND rel.relname = '${tableName}' AND nsp.nspname = '${tableSchema}'
+      ORDER BY con.conname, k.ord;`,
 					);
 
 					const tableChecks = await db.query(`SELECT 
@@ -1258,7 +1270,8 @@ WHERE
 						tc.table_name = '${tableName}'
 						AND tc.constraint_schema = '${tableSchema}'
 						AND tc.constraint_type = 'CHECK'
-						AND con.contype = 'c';`);
+						AND con.contype = 'c'
+					ORDER BY tc.constraint_name;`);
 
 					columnsCount += tableResponse.length;
 					if (progressCallback) {
@@ -1293,16 +1306,16 @@ WHERE
             pg_catalog.pg_constraint con
             JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
             JOIN pg_catalog.pg_namespace nsp ON nsp.oid = con.connamespace
-            LEFT JOIN pg_catalog.pg_attribute att ON att.attnum = ANY (con.conkey)
-              AND att.attrelid = con.conrelid
-            LEFT JOIN pg_catalog.pg_class frel ON frel.oid = con.confrelid
-            LEFT JOIN pg_catalog.pg_namespace fnsp ON fnsp.oid = frel.relnamespace
-            LEFT JOIN pg_catalog.pg_attribute fatt ON fatt.attnum = ANY (con.confkey)
-              AND fatt.attrelid = con.confrelid
+            JOIN pg_catalog.pg_class frel ON frel.oid = con.confrelid
+            JOIN pg_catalog.pg_namespace fnsp ON fnsp.oid = frel.relnamespace
+            CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(attnum, fattnum, ord)
+            JOIN pg_catalog.pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum
+            JOIN pg_catalog.pg_attribute fatt ON fatt.attrelid = con.confrelid AND fatt.attnum = k.fattnum
           WHERE
             nsp.nspname = '${tableSchema}'
             AND rel.relname = '${tableName}'
-            AND con.contype IN ('f');`,
+            AND con.contype IN ('f')
+          ORDER BY con.conname, k.ord;`,
 					);
 
 					foreignKeysCount += tableForeignKeys.length;
@@ -1405,16 +1418,9 @@ WHERE
 						const cprimaryKey = tableConstraints.filter((mapRow) => mapRow.constraint_type === 'PRIMARY KEY');
 
 						if (cprimaryKey.length > 1) {
-							const tableCompositePkName = await db.query(
-								`SELECT conname AS primary_key
-            FROM   pg_constraint join pg_class on (pg_class.oid = conrelid)
-            WHERE  contype = 'p' 
-            AND    connamespace = $1::regnamespace  
-            AND    pg_class.relname = $2;`,
-								[tableSchema, tableName],
-							);
-							primaryKeys[tableCompositePkName[0].primary_key] = {
-								name: tableCompositePkName[0].primary_key,
+							const compositePkName: string = cprimaryKey[0].constraint_name;
+							primaryKeys[compositePkName] = {
+								name: compositePkName,
 								columns: cprimaryKey.map((c: any) => c.column_name),
 							};
 						}
@@ -1565,10 +1571,11 @@ WHERE
             ON i.indrelid = a.attrelid AND k.attnum = a.attnum
           JOIN pg_namespace c on c.oid = t.relnamespace
         LEFT JOIN pg_am AS am ON ic.relam = am.oid
-        JOIN pg_opclass opc ON opc.oid = ANY(i.indclass)
+        LEFT JOIN pg_opclass opc ON opc.oid = i.indclass[k.i - 1]
       WHERE
       c.nspname = '${tableSchema}' AND
-      t.relname = '${tableName}';`,
+      t.relname = '${tableName}'
+      ORDER BY t.relname, ic.relname, k.i;`,
 					);
 
 					const dbIndexFromConstraint = await db.query(
@@ -1907,6 +1914,21 @@ WHERE
 	for await (const _ of allViews) {
 	}
 
+	// Tables and views finish in any order when queried concurrently; return them
+	// (and their internals) in catalog order so the output is the same on every run.
+	const tablesInOrder: Record<string, Table> = {};
+	const viewsInOrder: Record<string, View> = {};
+	const internalTablesInOrder: PgKitInternals['tables'] = {};
+	for (const row of allTables) {
+		const key = `${row.table_schema}.${row.table_name}`;
+		if (result[key]) tablesInOrder[key] = result[key];
+		if (views[key]) viewsInOrder[key] = views[key];
+		if (internals.tables[row.table_name] && !internalTablesInOrder[row.table_name]) {
+			internalTablesInOrder[row.table_name] = internals.tables[row.table_name];
+		}
+	}
+	internals.tables = internalTablesInOrder;
+
 	if (progressCallback) {
 		progressCallback('columns', columnsCount, 'done');
 		progressCallback('indexes', indexesCount, 'done');
@@ -1920,13 +1942,13 @@ WHERE
 	return {
 		version: '7',
 		dialect: 'postgresql',
-		tables: result,
+		tables: tablesInOrder,
 		enums: enumsToReturn,
 		schemas: schemasObject,
 		sequences: sequencesToReturn,
 		roles: rolesToReturn,
 		policies,
-		views: views,
+		views: viewsInOrder,
 		_meta: {
 			schemas: {},
 			tables: {},
@@ -2039,7 +2061,10 @@ const getColumnsInfoQuery = ({ schema, table, db }: { schema: string; table: str
             END 
         ELSE NULL 
     END AS is_nullable,  -- NULL or NOT NULL constraint
-    a.attndims AS array_dimensions,  -- Array dimensions
+    CASE
+        WHEN a.attndims = 0 AND enum_t.typelem <> 0 AND enum_t.typlen = -1 THEN 1
+        ELSE a.attndims
+    END AS array_dimensions,  -- Array dimensions (attndims can be 0 for arrays)
     CASE 
         WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) 
         AND EXISTS (

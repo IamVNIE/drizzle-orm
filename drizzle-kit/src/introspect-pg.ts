@@ -864,9 +864,13 @@ const column = (
 	}
 
 	if (lowered.startsWith('bigserial')) {
-		return `${withCasing(name, casing)}: bigserial(${
+		// Plain numbers, like bigint below: a JS BigInt cannot be JSON serialized, and
+		// serial ids stay far below Number.MAX_SAFE_INTEGER.
+		let out = `// You can use { mode: "bigint" } if numbers are exceeding js number limitations\n\t`;
+		out += `${withCasing(name, casing)}: bigserial(${
 			dbColumnName({ name, casing, withMode: true })
-		}{ mode: "bigint" })`;
+		}{ mode: "number" })`;
+		return out;
 	}
 
 	if (lowered.startsWith('integer')) {
